@@ -1,4 +1,6 @@
+import mimetypes
 import os
+from pathlib import PurePath
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, UploadFile, File, HTTPException
@@ -19,25 +21,33 @@ app.add_middleware(
 
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-ALLOWED_AUDIO_TYPES = {
-    "audio/flac",
-    "audio/mpeg",
-    "audio/mp4",
-    "audio/wav",
-    "audio/ogg",
-    "audio/webm",
-    "audio/x-m4a",
-    "audio/x-wav",
-    "audio/x-flac",
+EXTENSION_MAP = {
+    ".flac": "audio/flac",
+    ".mp3": "audio/mpeg",
+    ".mp4": "audio/mp4",
+    ".m4a": "audio/x-m4a",
+    ".ogg": "audio/ogg",
+    ".oga": "audio/ogg",
+    ".wav": "audio/wav",
+    ".webm": "audio/webm",
 }
+
+ALLOWED_AUDIO_TYPES = set(EXTENSION_MAP.values())
 
 MAX_FILE_SIZE = 5 * 1024 * 1024
 
 
-def _normalise_content_type(content_type: str | None) -> str | None:
-    if not content_type:
-        return None
-    return content_type.split(";")[0].strip().lower()
+def _resolve_content_type(content_type: str | None, filename: str | None) -> str | None:
+    if content_type:
+        normalised = content_type.split(";")[0].strip().lower()
+        if normalised != "application/octet-stream":
+            return normalised
+    if filename:
+        ext = PurePath(filename).suffix.lower()
+        mapped = EXTENSION_MAP.get(ext)
+        if mapped:
+            return mapped
+    return content_type.split(";")[0].strip().lower() if content_type else None
 
 
 @app.get("/api/health")
@@ -49,7 +59,7 @@ async def health():
 
 @app.post("/api/transcribe")
 async def transcribe(audio: UploadFile = File(...)):
-    content_type = _normalise_content_type(audio.content_type)
+    content_type = _resolve_content_type(audio.content_type, audio.filename)
     if not content_type or content_type not in ALLOWED_AUDIO_TYPES:
         raise HTTPException(
             status_code=400,

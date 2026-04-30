@@ -2,11 +2,11 @@ import { Geist, Geist_Mono, Noto_Serif } from "next/font/google"
 
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
-import { cn } from "@/lib/utils";
-import Navbar from "@/components/Navbar";
-import { Metadata } from "next";
+import { cn } from "@/lib/utils"
+import Navbar from "@/components/Navbar"
+import { Metadata } from "next"
 
-const notoSerif = Noto_Serif({subsets:['latin'],variable:'--font-serif'});
+const notoSerif = Noto_Serif({ subsets: ["latin"], variable: "--font-serif" })
 
 const fontSans = Geist({
   subsets: ["latin"],
@@ -18,7 +18,7 @@ const fontMono = Geist_Mono({
   variable: "--font-mono",
 })
 
-export const metadata:Metadata = {
+export const metadata: Metadata = {
   title: "MeetingMind - AI Meeting Notes for Productive Teams",
   description:
     "MeetingMind is an AI-powered meeting assistant that automatically generates accurate, actionable summaries of your meetings. Stay organized, aligned, and never miss a follow-up again.",
@@ -33,11 +33,17 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={cn("antialiased", fontSans.variable, fontMono.variable, "font-serif", notoSerif.variable)}
+      className={cn(
+        "antialiased",
+        fontSans.variable,
+        fontMono.variable,
+        "font-serif",
+        notoSerif.variable
+      )}
     >
       <body className="bg-accent">
-          <Navbar/>
-          {children}
+        <Navbar />
+        {children}
       </body>
     </html>
   )
