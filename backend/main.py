@@ -1,0 +1,80 @@
+import os
+
+from dotenv import load_dotenv
+from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from groq import Groq
+
+load_dotenv()
+
+app = FastAPI(title="MeetingMind Backend")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+
+ALLOWED_AUDIO_TYPES = {
+    "audio/flac",
+    "audio/mpeg",
+    "audio/mp4",
+    "audio/wav",
+    "audio/ogg",
+    "audio/webm",
+    "audio/x-m4a",
+    "audio/x-wav",
+    "audio/x-flac",
+}
+
+MAX_FILE_SIZE = 5 * 1024 * 1024
+
+
+def _normalise_content_type(content_type: str | None) -> str | None:
+    if not content_type:
+        return None
+    return content_type.split(";")[0].strip().lower()
+
+
+@app.get("/api/health")
+async def health():
+    if not os.getenv("GROQ_API_KEY"):
+        return {"status": "degraded", "detail": "GROQ_API_KEY not set"}
+    return {"status": "ok"}
+
+
+@app.post("/api/transcribe")
+async def transcribe(audio: UploadFile = File(...)):
+    content_type = _normalise_content_type(audio.content_type)
+    if not content_type or content_type not in ALLOWED_AUDIO_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Unsupported audio format: {audio.content_type}. "
+                f"Supported formats: flac, mp3, m4a, ogg, wav, webm"
+            ),
+        )
+
+    contents = await audio.read()
+    if len(contents) > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File too large ({len(contents) / 1024 / 1024:.1f} MB). Maximum size is 5 MB.",
+        )
+
+    try:
+        transcription = client.audio.transcriptions.create(
+            file=(audio.filename or "audio", contents),
+            model="whisper-large-v3-turbo",
+            response_format="json",
+        )
+        return {"text": transcription.text, "model": "whisper-large-v3-turbo"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Transcription failed: {e}",
+        )
